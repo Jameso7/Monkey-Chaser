@@ -1,0 +1,156 @@
+#include<TimerOne.h>
+//MP3 control
+#define MP3_PLAY 5
+
+#define MP3_NEXT 4
+#define MP3_PREV 6
+//Interrupts/logics
+#define PIR_PIN 2
+#define CALL_PIN 3
+//SOlar power
+#define BATTERY_ADC A6
+#define RELAY_PIN 7
+
+const int SAMPLES=10;
+int adc_average=0;
+
+volatile int pir_flag=0;
+volatile int call_flag=0;
+
+ int playing=0;
+ int call_started_timer=0;
+
+
+long int adc_sum=0;
+int isr_counter=0;
+volatile int seconds_passed=0;
+
+
+void init_pins(){
+digitalWrite(MP3_PLAY,LOW);
+digitalWrite(MP3_NEXT,LOW);
+digitalWrite(MP3_PREV,LOW);
+digitalWrite(RELAY_PIN,LOW);
+}
+
+void init_interrupts(){
+attachInterrupt(digitalPinToInterrupt(PIR_PIN), pir_isr, RISING);
+attachInterrupt(digitalPinToInterrupt(CALL_PIN), call_isr, FALLING);
+}
+//git push
+void pir_isr(){
+pir_flag=1;
+}
+
+void call_isr(){
+call_flag=1;
+}
+void toggle_pulse(int toggle_pin){
+    digitalWrite(toggle_pin,HIGH);
+    delay(700);
+    digitalWrite(toggle_pin,LOW);
+}
+
+
+void setup(){
+
+Serial.begin(9600);
+pinMode(MP3_PLAY, OUTPUT);
+pinMode(MP3_PREV, OUTPUT);
+pinMode(MP3_NEXT, OUTPUT);
+pinMode(PIR_PIN, INPUT);
+pinMode(CALL_PIN, INPUT_PULLUP);
+detachInterrupt(digitalPinToInterrupt(PIR_PIN));
+detachInterrupt(digitalPinToInterrupt(CALL_PIN));
+init_pins();
+init_interrupts();
+//disable interrupts
+Timer1.initialize(100000);
+Timer1.stop(); //stop timer
+Timer1.detachInterrupt();
+
+
+}
+
+void timer_isr(){
+
+  isr_counter++;
+  if(isr_counter==100){
+    seconds_passed=1;
+    isr_counter=0;
+    Timer1.stop();
+  }
+}
+
+int adc_value(){
+//average of SAMPLES for smooth value
+for (int i=0; i<SAMPLES;i++){
+  int value=analogRead(BATTERY_ADC);
+  adc_sum+=value;
+  delay(5);
+}
+adc_average=adc_sum/SAMPLES;
+return adc_average;
+}
+
+// void voltage_management(){
+//   if(adc_value()<0 || ){
+//     digitalWrite(RELAY_PIN, HIGH);
+//   }
+//   if(adc_value()>){
+
+
+//   }
+// }
+
+void loop(){
+
+// int val=adc_value();
+// Serial.println(val);
+
+if(pir_flag){
+  Serial.println("PIR DETECTED");
+  pir_flag=0;
+    playing=1;
+    toggle_pulse(MP3_PLAY);
+    Timer1.setPeriod(100000);
+    Timer1.attachInterrupt(timer_isr);
+    Timer1.start();
+    Serial.println("Started PIR ");
+}
+
+if(call_flag){
+  Serial.println("CALL DETECTED");
+  call_flag=0;
+
+  if(playing){
+      toggle_pulse(MP3_PLAY);
+      Serial.println("Paused \n");
+      playing=0;
+  }
+  else {
+      toggle_pulse(MP3_PLAY);
+      Serial.println("playing");
+      Timer1.setPeriod(100000);
+        Timer1.attachInterrupt(timer_isr);
+        Timer1.start();
+      playing=1;
+  }
+}
+
+if(seconds_passed && playing ){
+    seconds_passed=0;
+    playing=0;
+    Timer1.stop();
+    toggle_pulse(MP3_PLAY);
+    Serial.println("stopped song PIR 30 seconds \n");
+
+}
+
+
+
+
+
+
+
+}

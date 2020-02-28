@@ -146,11 +146,4 @@ if(seconds_passed && playing ){
     Serial.println("stopped song PIR 30 seconds \n");
 
 }
-
-
-
-
-
-
-
 }
